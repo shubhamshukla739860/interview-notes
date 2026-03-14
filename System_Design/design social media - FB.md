@@ -141,11 +141,8 @@ At a high level:
 
 ### 4.1 High-Level Architecture Diagram
 
-```mermaid
 
 ![Social Media System Design](diagram/social media - fb.jpeg)
-
-```
 
 
 ***
