@@ -142,58 +142,147 @@ At a high level:
 ### 4.1 High-Level Architecture Diagram
 
 ```mermaid
+Certainly, here is a clean and clear Mermaid diagram based on your image. It reorganizes the components into logical layers for a more professional presentation.
+
+### Diagram Logic
+
+* **Layered Structure:** I grouped the components into four distinct columns: Clients, Gateway & Services (Sync API layer), Asynchronous Processing & Cache, and Data Persistence.
+* **Schema Callouts:** I added small sub-text callouts to the database nodes to represent the schema details (like `user_id`, `follower_id`, `likes_count`) that were listed in your original image.
+* **Fanout Logic:** I've explicitly marked the PUSH and PULL logic descriptions from your image as part of the Feed Generation service.
+* **Decoupling:** The Engagement and Post services now pass events through Kafka to separate consumer services, representing a modern event-driven architecture.
+
+You can copy and render this code using any Mermaid-compatible tool.
+
+### Mermaid Diagram Code
+
+```mermaid
 graph TD
-    Client["Mobile / Web Client"]
-    APIGW["API Gateway / Load Balancer"]
+    %% -- Stylings --
+    classDef client fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef gateway fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000;
+    classDef service fill:#fff,stroke:#000,stroke-width:1.5px;
+    classDef async fill:#fff8e1,stroke:#fbc02d,stroke-width:1.5px,stroke-dasharray: 5 5;
+    classDef storage fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000;
+    classDef cache fill:#ffebee,stroke:#c62828,stroke-width:1.5px;
+    classDef label fill:none,stroke:none;
 
-    Auth["Auth Service"]
-    UserSvc["User Service"]
-    GraphSvc["Social Graph Service"]
-    PostSvc["Post Service"]
-    EngSvc["Engagement Service<br>(Likes / Comments)"]
-    FeedSvc["Feed Service<br>(Read API)"]
-    NotifSvc["Notification Service"]
-    MediaSvc["Media Service"]
-    ModSvc["Moderator / Content Review"]
+    %% -- Clients Column --
+    subgraph Clients ["Client Layer"]
+        C1[Web Client]:::client
+        C2[Mobile App (iOS)]:::client
+        C3[Mobile App (Android)]:::client
+    end
 
-    Kafka["Event Bus<br>(Kafka)"]
+    %% -- Gateway & Services (API Layer) --
+    subgraph GatewayServices ["Gateway & Services (Sync APIs)"]
+        GW[API Gateway & Load Balancer]:::gateway
+        note_gw(Authentication / Authorization<br/>Rate Limiting / Routing):::label
+        GW --> note_gw
 
-    UserDB["User DB<br>(SQL)"]
-    GraphDB["Follow DB<br>(KV / Wide-Column)"]
-    PostDB["Post DB<br>(NoSQL)"]
-    MediaStore["Object Store + CDN"]
-    EngDB["Engagement DB<br>(NoSQL)"]
-    FeedStore["Feed Store<br>(Redis / Cassandra)"]
-    SearchIdx["Search / Index<br>(ElasticSearch)"]
+        SV_User[User Svc]:::service
+        SV_Post[Content Svc]:::service
+        SV_Follow[Follower Svc]:::service
+        SV_Feed[Feed Svc]:::service
+        SV_Eng[Engagement Svc]:::service
+    end
 
-    Client --> APIGW
+    %% -- Asynchronous Processing & Cache --
+    subgraph AsyncCache ["Async Processing & Cache"]
+        %% -- Kafka Cluster --
+        subgraph KafkaCluster ["Kafka Bus (Event Topics)"]
+            K_Post[Topic: Post Creation]:::async
+            K_Eng[Topic: Engagement Events]:::async
+            K_Feed[Topic: Feed Generation]:::async
+        end
 
-    APIGW --> Auth
-    APIGW --> UserSvc
-    APIGW --> GraphSvc
-    APIGW --> PostSvc
-    APIGW --> EngSvc
-    APIGW --> FeedSvc
-    APIGW --> NotifSvc
-    APIGW --> MediaSvc
+        %% -- Processing Workers --
+        Proc_Moderation[Post Consumer Svc (Moderation, Indexing)]:::service
+        Proc_FeedFanout[Feed Consumer (Worker Cluster)]:::service
+        Proc_Engagement[Engagement Processor]:::service
 
-    UserSvc --> UserDB
-    GraphSvc --> GraphDB
-    PostSvc --> PostDB
-    EngSvc --> EngDB
-    FeedSvc --> FeedStore
-    MediaSvc --> MediaStore
+        %% -- Fanout Push Service --
+        SV_Fanout[Fanout Svc (PUSH)]:::service
+        note_fanout(Fanout on write:<br/>Small friend circles):::label
+        SV_Fanout --> note_fanout
 
-    PostSvc --> Kafka
-    GraphSvc --> Kafka
-    EngSvc --> Kafka
+        %% -- Caches --
+        Redis_UserProfile[Redis User Profile Cache]:::cache
+        Redis_Follower[Redis Follower Cache]:::cache
+        Redis_Feed[Redis Feed Cache Cluster]:::cache
+    end
 
-    Kafka --> FeedSvc
-    Kafka --> NotifSvc
-    Kafka --> ModSvc
-    ModSvc --> PostDB
+    %% -- Data Persistence Layer --
+    subgraph DataPersistence ["Data Persistence"]
+        %% -- Databases & Schema Callouts --
+        DB_User[User DB (Postgres)]:::storage
+        note_dbuser(Schema: User_id, username, details):::label
+        DB_User --> note_dbuser
 
-    PostDB --> SearchIdx
+        DB_Follow[Follower DB (Postgres)]:::storage
+        note_dbfollow(Schema: Follower_id, Following_id, metadata):::label
+        DB_Follow --> note_dbfollow
+
+        DB_Post[Post DB (Cassandra/NoSQL)]:::storage
+        note_dbpost(Schema: Post_id, Content_text, likes_count, share_count, media_url):::label
+        DB_Post --> note_dbpost
+
+        DB_EngLike[Like DB (Postgres)]:::storage
+        note_dblike(Schema: Like_id, reaction_type, like_count):::label
+        DB_EngLike --> note_dblike
+
+        DB_EngCom[Comment DB (Postgres)]:::storage
+        note_dbcomment(Schema: Comment_id, content, user_id):::label
+        DB_EngCom --> note_dbcomment
+
+        DB_Feed[Feed DB (Offline Store)]:::storage
+        S3[S3 (Object Storage)]:::storage
+    end
+
+    %% -- Core Synchronous Flows --
+    Clients --> GW
+    GW --> SV_User
+    GW --> SV_Post
+    GW --> SV_Follow
+    GW --> SV_Eng
+    GW --> SV_Feed
+
+    %% -- User & Follower Data Flows --
+    SV_User --> DB_User
+    SV_User <--> Redis_UserProfile
+    SV_Follow --> DB_Follow
+    SV_Follow <--> Redis_Follower
+
+    %% -- Feed Reads --
+    SV_Feed --"Read feed"--> Redis_Feed
+
+    %% -- Main Post Lifecycle Flows (Content Svc) --
+    SV_Post --"Media upload"--> S3
+    SV_Post --"Trigger post event"--> K_Post
+    SV_Post --"Initiate Push"--> SV_Fanout
+
+    %% -- Post Processing (Asynchronous) --
+    K_Post --> Proc_Moderation
+    Proc_Moderation --> DB_Post
+    Proc_Moderation --"Push indexed text"--> note_gw
+
+    %% -- Feed Generation Flows (Push/Pull) --
+    %% Pull (on-demand read) logic note
+    note_feedgen(Feed Generation (Fanout model):<br/>- Pull: On-demand (celebrity)<br/>- Push: Fanout on write (small circles)):::label
+    SV_Fanout --> K_Feed
+
+    K_Feed --> Proc_FeedFanout
+    Proc_FeedFanout --"Query Graph"--> Redis_Follower
+    Proc_FeedFanout --"Update Feeds"--> Redis_Feed
+    Proc_FeedFanout --"Write"--> DB_Feed
+
+    %% -- Engagement Flows (Asynchronous) --
+    SV_Eng --"Publish reaction"--> K_Eng
+    K_Eng --> Proc_Engagement
+    Proc_Engagement --> DB_EngLike
+    Proc_Engagement --> DB_EngCom
+    Proc_Engagement --"Aggregate"--> DB_Post
+
+```
 ```
 
 **How I’d explain this diagram in an interview:**
