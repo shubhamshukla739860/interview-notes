@@ -1,149 +1,509 @@
 
-# scan all online resources leetcode discussion linkedin post and all other plateform like google query search quara search and give me list of system design questions asked in walmart system design round
+# design a facebook like social media : HLD
 
-Here’s a consolidated list of system‑design style questions that are explicitly reported as being asked in Walmart / Walmart Global Tech interviews, plus the Walmart‑specific variants that prep sites call out as “common Walmart system design questions.” I’ve de‑duplicated overlapping items and grouped them by theme.
+i will share the website link you need to prepare best notes for me with diagram and each and everything which is required for best HLD interview :
 
-***
+[https://www.interviewwithbunny.com/systemdesign/13](https://www.interviewwithbunny.com/systemdesign/13)
 
-## A. Reported “exact” Walmart system design questions
-
-These come from LinkedIn posts and interview write‑ups that explicitly say they were asked at Walmart.[^1][^2][^3][^4][^5][^6]
-
-**General product / social systems**
-
-- Design Twitter.[^3][^6]
-- Design the Feeds section of Instagram / Facebook.[^2]
-- Design Google Play Store.[^6][^3]
-
-**Retail / e‑commerce \& Walmart‑like flows**
-
-- Design an e‑commerce platform.[^4][^3][^6]
-- Design an order management system.[^3][^6]
-- Design a recommendation system / “Frequently Bought Together” recommendations system.[^5][^4][^6][^3]
-- Design a real‑time inventory tracking system.[^4][^6][^3]
-- Design a rating system for an e‑commerce website (Flipkart/Walmart‑like).[^1][^6][^3]
-- Design a warehouse management system.[^6][^3][^4]
-
-**Infrastructure / platform components**
-
-- Design a load balancer.[^3][^4][^6]
-- Design a URL shortener.[^6][^3]
-- Design a logging system.[^3][^6]
-
-**Mobility / domain‑specific apps**
-
-- Design Aarogya Setu.[^6][^3]
-- Design Zoomcar app (LLD).[^3][^6]
-- Design an app for waste management.[^6][^3]
-- Design a reservation system for a parking lot.[^3][^6]
-
-**Classic LLD questions sometimes paired with Walmart**
-
-- Design a library management system (LLD).[^6][^3]
-- Flash‑sale / high‑concurrency purchase service (design + code, LLD+HLD style).[^5]
+Sure, let me first structure the problem clearly and then walk you through a solid HLD that you can present confidently in interviews.
 
 ***
 
-## B. Walmart‑domain questions from focused guides
+## 1. Interview-Style Opening
 
-Several dedicated Walmart system‑design prep guides list common Walmart‑style questions that map directly to real retail systems (inventory, payments, logistics, etc.).[^7][^8][^9][^10][^4]
-
-**Walmart marketplace and checkout**
-
-- How would you design Walmart’s online marketplace (buyers, sellers, catalog, orders, payments, notifications)?[^8]
-- Design Walmart’s payment and settlement system / payment processing pipeline.[^8]
-- Design the checkout and order‑fulfillment flow for Walmart’s online store (pricing, cart, promotions, payment, order status).[^10]
-
-**Inventory, logistics, and fulfillment**
-
-- Design a global / real‑time inventory management system across stores, warehouses, and online orders.[^7][^10][^8]
-- Design a warehouse management system (receiving, put‑away, picking, packing, shipping).[^10][^4]
-- Design an order fulfillment and delivery system (routing from fulfillment centers / stores to customers, last‑mile logistics).[^7][^10]
-- Design a multichannel curbside‑pickup and store‑assignment system.[^10]
-
-**Search, discovery, and personalization**
-
-- Design Walmart’s product search and discovery system (indexing billions of SKUs, autocomplete, relevance, typo‑tolerance).[^8][^10]
-- Design Walmart’s product recommendation system (personalized, real‑time, at scale).[^4][^8][^10]
-- Design a “Frequently Bought Together” recommendation pipeline over historical purchase data.[^5][^8]
-
-**Fraud, risk, and trust**
-
-- Design a fraud detection system for Walmart transactions.[^8][^10]
-- Design a trust/safety system that flags suspicious orders or accounts in real time.[^10][^8]
-
-**Notifications, reliability, and resilience**
-
-- Design a notification system for order updates (email/SMS/push, retries, dead‑letter handling).[^8]
-- How would you ensure Walmart remains operational if a regional data center goes down? (multi‑region, active‑active, failover).[^8]
-
-**IoT / in‑store systems**
-
-- Design real‑time in‑store IoT monitoring (shelf sensors, POS terminals) that works even when stores are offline and syncs later.[^7][^10]
+“Let me first outline the requirements for a Facebook-like social media platform, then I’ll propose a scalable high-level architecture, walk through the core components and data flows, and finally discuss trade-offs like feed generation models, storage choices, and scalability.”
 
 ***
 
-## C. How to use this list
+## 2. Problem Understanding and Clarification
 
-- Items in section **A** are the closest to “verbatim questions” reported by specific candidates and coaching pages claiming “EXACT questions asked at Walmart in 2025.”[^2][^1][^5][^3][^6]
-- Items in section **B** are from Walmart‑specific system design guides that aggregate “common Walmart questions” around inventory, checkout, logistics, payments, fraud, and recommendations, and are very representative of what interviewers like to ask.[^9][^4][^7][^10][^8]
+For “Facebook-like social media”, I’ll assume these **core features** (as also typically covered in such system-design discussions).[^1][^2]
 
-If you tell me which role level you’re targeting (SDE‑2 vs SDE‑3) and whether your team is more e‑commerce, supply‑chain, or platform, I can pick 5–7 of these that are most likely for you and outline exactly how to approach each in an interview.
-<span style="display:none">[^11][^12][^13][^14][^15][^16][^17][^18][^19][^20][^21][^22][^23][^24][^25][^26][^27]</span>
+- User onboarding: sign up, login, manage profile.
+- Social graph: follow / friend (I’ll assume **follow** model like Instagram for simplicity).[^1]
+- Posts: text + images (optionally video, but we can call that out as future extension).
+- Engagements: likes, comments, maybe simple counters (like_count, comment_count).[^1]
+- News feed: timeline of posts from people I follow, reasonably fresh, low-latency (sub-500 ms perceived load target).[^3][^1]
+- Notifications: new follower, like, comment.[^2]
+- Non-functional:
+    - Scale: tens/hundreds of millions of users, millions of DAU.
+    - High write volume on posts, likes, follows.
+    - Low latency feed reads.
+    - High availability, eventual consistency acceptable for counters/feed.
+
+**Clarifications I’d confirm with the interviewer (in real interview):**
+
+- “Can we assume only ‘follow’ relationships and skip bidirectional Facebook-style friends to keep it simpler?”
+- “Is sub-500 ms feed load latency for P95 a reasonable target?”[^1]
+- “Do we need to support videos in HLD, or can we treat all media as ‘large object in object store via CDN’?”
+
+**Inputs \& Outputs (high level):**
+
+- Inputs: API calls from mobile/web for signup/login, follow/unfollow, create post, like/comment, fetch feed, view profile.
+- Outputs: JSON responses for these APIs, plus async pushes for notifications.
+
+**Key edge cases to keep in mind:**
+
+- Users with **huge follower counts** (celebrities) – feed fanout issues.[^3][^1]
+- Deleted/blocked users or posts.
+- Cold start feed (new user with no follows).
+- Hot keys (very popular posts, hot users).
+
+***
+
+## 3. High-Level Approach (Before Code)
+
+### 3.1 Brute-Force / Naive Approach
+
+- Single monolith service + single relational DB (e.g., MySQL).
+- Tables for Users, Follows, Posts, Likes, Comments.
+- Feed query: `SELECT * FROM posts WHERE author IN (people_I_follow) ORDER BY created_at DESC LIMIT N`.
+- Problems:
+    - Query explodes for large follow lists, heavy joins.[^3]
+    - Cannot scale to many users and high QPS.
+    - Lacks horizontal scalability and resilience.
+
+
+### 3.2 Optimized, Interview-Ready HLD
+
+I’d design it as **microservice-ish** logical components behind an API Gateway:[^4][^3][^1]
+
+- API Gateway / BFF.
+- Auth Service.
+- User Service + User DB.
+- Social Graph Service (follow/unfollow) + Graph/Key-Value DB.[^5]
+- Post Service + Post Store (NoSQL + Object Store for media).[^2][^1]
+- Engagement (Like/Comment) Service + Engagement DB.[^1]
+- Feed Service:
+    - **Feed Fanout Workers / Materializer** consuming events (new post, follow) from Kafka (or any log).[^3][^1]
+    - Precomputed per-user feeds in a fast store (Redis / Cassandra).[^4][^1]
+- Notification Service (push/web notifications).[^2]
+- Search / Index Service (ElasticSearch/OpenSearch) – optional for core HLD.[^2]
+- Media Service + Object Store + CDN for images/videos.[^6][^2]
+
+
+### 3.3 Feed Generation Model
+
+Classic trade-off: **fanout on write vs fanout on read**.[^3][^1]
+
+- **Fanout on write**: when a user posts, we push that post id into each follower’s feed timeline.
+    - Pros: feed read is super fast (just fetch cached timeline).[^3]
+    - Cons: heavy write amplification; problematic for celebrity accounts.
+- **Fanout on read**: compute feed on demand by aggregating latest posts from followees.
+    - Pros: cheap on writes; easier for celebrities.
+    - Cons: slow reads, large aggregation queries.[^3]
+
+Realistic approach (and what I’d present):
+
+- **Hybrid model**:
+    - For normal users, use **fanout on write**, store per-user feed in Redis/Cassandra.[^4][^3]
+    - For extremely high-fanout users, do **partial fanout** or **on-read fetch** to avoid blowing up writes.[^3]
+
+
+### 3.4 Datastores
+
+- **User \& Auth**: Relational DB (e.g., MySQL/Postgres) for strong consistency \& constraints.[^2]
+- **Social Graph**:
+    - Key-value / Wide-column (e.g., Cassandra, DynamoDB) modeling follower/following lists.[^5]
+- **Posts**:
+    - Metadata (id, author, text, timestamps): NoSQL (Cassandra/DynamoDB) or sharded RDBMS.
+    - Media content: Object Store (S3/GCS) fronted by CDN.[^6][^2]
+- **Engagements (likes/comments)**:
+    - NoSQL with write-optimized schema and counters; plus background materialization of counts.[^4][^1]
+- **Feed**:
+    - NoSQL (Cassandra) or Redis for per-user timeline lists.[^4][^3]
+- **Search / indexing**:
+    - ElasticSearch/OpenSearch cluster for text/search features.[^2]
+
+
+### 3.5 Messaging and Asynchronous Processing
+
+- Kafka (or similar) topics: `post_created`, `user_followed`, `like_created`, `comment_created`.[^1]
+- Consumers:
+    - Feed Materializer Service updates per-user feeds.[^4][^1]
+    - Notification Service triggers notifications.
+    - Analytics pipelines (not necessary to detail, but mention).
+
+
+### 3.6 Complexity
+
+At a high level:
+
+- Feed read:
+    - Time: $O(1)$ to fetch a pre-computed list segment from feed store (plus pagination).
+    - Space: $O(F \cdot P)$ where $F$ is average follower count and $P$ is posts per user in feed horizon (mitigated via TTL or trimming).
+- Write path:
+    - Post creation: roughly $O(F)$ writes into follower timelines for fanout on write; mitigated via batching and hybrid strategy.[^3]
+
+***
+
+## 4. Visual Explanation (Mermaid-First, Mandatory)
+
+### 4.1 High-Level Architecture Diagram
+
+```mermaid
+graph TD
+    Client["Mobile / Web Client"]
+    APIGW["API Gateway / Load Balancer"]
+
+    Auth["Auth Service"]
+    UserSvc["User Service"]
+    GraphSvc["Social Graph Service"]
+    PostSvc["Post Service"]
+    EngSvc["Engagement Service<br>(Likes / Comments)"]
+    FeedSvc["Feed Service<br>(Read API)"]
+    NotifSvc["Notification Service"]
+    MediaSvc["Media Service"]
+    ModSvc["Moderator / Content Review"]
+
+    Kafka["Event Bus<br>(Kafka)"]
+
+    UserDB["User DB<br>(SQL)"]
+    GraphDB["Follow DB<br>(KV / Wide-Column)"]
+    PostDB["Post DB<br>(NoSQL)"]
+    MediaStore["Object Store + CDN"]
+    EngDB["Engagement DB<br>(NoSQL)"]
+    FeedStore["Feed Store<br>(Redis / Cassandra)"]
+    SearchIdx["Search / Index<br>(ElasticSearch)"]
+
+    Client --> APIGW
+
+    APIGW --> Auth
+    APIGW --> UserSvc
+    APIGW --> GraphSvc
+    APIGW --> PostSvc
+    APIGW --> EngSvc
+    APIGW --> FeedSvc
+    APIGW --> NotifSvc
+    APIGW --> MediaSvc
+
+    UserSvc --> UserDB
+    GraphSvc --> GraphDB
+    PostSvc --> PostDB
+    EngSvc --> EngDB
+    FeedSvc --> FeedStore
+    MediaSvc --> MediaStore
+
+    PostSvc --> Kafka
+    GraphSvc --> Kafka
+    EngSvc --> Kafka
+
+    Kafka --> FeedSvc
+    Kafka --> NotifSvc
+    Kafka --> ModSvc
+    ModSvc --> PostDB
+
+    PostDB --> SearchIdx
+```
+
+**How I’d explain this diagram in an interview:**
+
+- Clients talk to the system through an API Gateway, which routes to multiple backend services.[^1][^4]
+- Each core concern (users, social graph, posts, engagement, feed, media, notifications) is handled by a dedicated service and backing store.[^2][^4]
+- Kafka decouples write-heavy operations like feed materialization and notifications from synchronous user flows.[^1]
+- Media goes to object storage served via CDN to keep large files off the primary databases.[^6][^2]
+
+***
+
+## 5. Java Code (Production-Quality)
+
+I’ll write **sample interfaces / key methods** for the **Feed Service** and **Post Service** to show how the fanout-on-write model might look. This is illustrative, not full production code.
+
+```java
+public class Post {
+    private String id;
+    private String authorId;
+    private String text;
+    private String mediaUrl;
+    private long createdAtEpochMs;
+
+    // getters, setters, constructors omitted for brevity
+}
+
+public interface PostRepository {
+    void savePost(Post post);
+    List<Post> getPostsByAuthor(String authorId, int limit, String paginationToken);
+}
+
+public interface SocialGraphRepository {
+    // Followers of a user (who will receive this user's posts)
+    List<String> getFollowerIds(String userId, int batchSize, String paginationToken);
+}
+
+public interface FeedRepository {
+    void pushPostToUserFeed(String userId, String postId, long createdAtEpochMs);
+    List<String> getFeedPostIds(String userId, int limit, String paginationToken);
+}
+
+public class PostService {
+
+    private final PostRepository postRepository;
+    private final EventPublisher eventPublisher; // wraps Kafka or other message bus
+
+    public PostService(PostRepository postRepository,
+                       EventPublisher eventPublisher) {
+        this.postRepository = postRepository;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public Post createPost(String authorId, String text, String mediaUrl) {
+        Post post = new Post();
+        post.setId(IdGenerator.newId());
+        post.setAuthorId(authorId);
+        post.setText(text);
+        post.setMediaUrl(mediaUrl);
+        post.setCreatedAtEpochMs(System.currentTimeMillis());
+
+        postRepository.savePost(post);
+
+        // Publish asynchronous event for feed fanout, notifications, etc.
+        eventPublisher.publishPostCreated(post);
+
+        return post;
+    }
+}
+
+public class FeedFanoutWorker {
+
+    private final SocialGraphRepository socialGraphRepository;
+    private final FeedRepository feedRepository;
+
+    public FeedFanoutWorker(SocialGraphRepository socialGraphRepository,
+                            FeedRepository feedRepository) {
+        this.socialGraphRepository = socialGraphRepository;
+        this.feedRepository = feedRepository;
+    }
+
+    // This would be triggered by consuming from the "post_created" topic
+    public void handlePostCreated(Post post) {
+        String authorId = post.getAuthorId();
+        String paginationToken = null;
+
+        while (true) {
+            List<String> followerIds =
+                    socialGraphRepository.getFollowerIds(authorId, 1000, paginationToken);
+            if (followerIds.isEmpty()) {
+                break;
+            }
+
+            for (String followerId : followerIds) {
+                feedRepository.pushPostToUserFeed(
+                        followerId,
+                        post.getId(),
+                        post.getCreatedAtEpochMs()
+                );
+            }
+
+            // update pagination token for the next batch
+            paginationToken = computeNextPaginationToken(followerIds);
+        }
+    }
+
+    private String computeNextPaginationToken(List<String> lastBatch) {
+        // implementation depends on underlying DB; placeholder here
+        return lastBatch.get(lastBatch.size() - 1);
+    }
+}
+
+public class FeedService {
+
+    private final FeedRepository feedRepository;
+    private final PostRepository postRepository;
+
+    public FeedService(FeedRepository feedRepository,
+                       PostRepository postRepository) {
+        this.feedRepository = feedRepository;
+        this.postRepository = postRepository;
+    }
+
+    public List<Post> getUserFeed(String userId, int limit, String paginationToken) {
+        List<String> postIds =
+                feedRepository.getFeedPostIds(userId, limit, paginationToken);
+
+        // In practice, we might batch-load posts by IDs from PostDB
+        List<Post> posts = new ArrayList<>(postIds.size());
+        for (String postId : postIds) {
+            // this would be replaced by a batch fetch in a real system
+            posts.add(postRepository.getPostById(postId));
+        }
+
+        return posts;
+    }
+}
+```
+
+
+***
+
+## 6. Code Walkthrough (Line-by-Line)
+
+- `Post` class: represents the core post entity with id, author, text, optional media URL, and timestamp. This maps to rows in the Post DB and to JSON in APIs.
+- `PostRepository`: abstraction over the Post DB (Cassandra/DynamoDB/SQL). We hide storage details behind this interface.
+- `SocialGraphRepository`: provides follower lists for a user, likely backed by a wide-column DB or key-value store. We support pagination because some users may have millions of followers.[^5]
+- `FeedRepository`: wraps access to the **Feed Store** where we maintain per-user timelines (lists of post IDs sorted by time).[^4][^3]
+
+**PostService:**
+
+- `createPost`:
+    - Generates a new post id via some `IdGenerator` (e.g., Snowflake).
+    - Persists the post in the Post DB via `postRepository.savePost`.
+    - Publishes a `post_created` event asynchronously using `EventPublisher`. This decouples feed fanout and notification processing from the user’s request latency.[^1]
+
+**FeedFanoutWorker:**
+
+- This represents a background worker that consumes the `post_created` Kafka topic.[^1]
+- For each post:
+    - Fetches followers of the author in **batches** (e.g., 1000 at a time) to avoid loading the entire list into memory.
+    - For each follower, calls `feedRepository.pushPostToUserFeed`, which appends the post id to that follower’s feed list in the Feed Store.[^4][^3]
+    - Uses a pagination token pattern to walk through all followers.
+
+This is the **fanout-on-write** logic; we can add guards here:
+
+- If follower count exceeds a threshold (e.g., celebrity), we could either:
+    - Push only to a subset (e.g., most engaged followers).
+    - Or mark this author as “celebrity” and handle their posts differently (fanout on read).
+
+**FeedService:**
+
+- `getUserFeed`:
+    - Reads a list of post IDs from the Feed Store for that user, with pagination.[^4][^3]
+    - Fetches the corresponding Post objects (ideally in a batch).
+    - Returns posts to the caller (API Gateway -> client).
+
+The core idea: reads are cheap because the heavy work of computing the feed timelines happens asynchronously at write time.
+
+***
+
+## 7. How I Would Explain This to the Interviewer
+
+“So the key idea here is to separate concerns: user management, social graph, posts, engagements, and feed generation all live in dedicated services with their own optimized data stores. On the write path, when a user creates a post, we persist it quickly and then emit an event to Kafka, so the synchronous API call remains fast. A background Feed Fanout worker consumes those events, looks up the author’s followers in a scalable key-value/wide-column store, and pushes the post ID into each follower’s feed list in a fast Feed Store like Redis or Cassandra.
+
+On the read path, the client just asks for `/feed`, and the Feed Service reads a precomputed slice of post IDs from the Feed Store and joins them with post metadata. That gives us sub-500 ms feed loads even under high traffic, because we’ve moved the expensive joins and graph traversal off the critical path. For very high-fanout accounts, we can switch to a hybrid strategy where we don’t fully fan out on write, to avoid write amplification. Overall, this design scales horizontally, keeps latency under control, and is flexible enough to add features like notifications, search, and moderation via additional consumers of the same event streams.”[^5][^4][^3][^1]
+
+***
+
+## 8. Edge Cases and Follow-Up Questions
+
+**Key Edge Cases:**
+
+- **Celebrity fanout**: millions of followers – we need hybrid fanout or special handling, maybe separate topic partitioning and partial fanout.[^3]
+- **Deleted posts/users**: soft deletes with background cleanup, plus filtering from feed queries.
+- **Privacy / blocking**: store block lists and filter feed/graph results appropriately.
+- **Cold start**: new user with no follows – show recommended content or “reels/explore” type feed powered by a recommendation system.
+- **Feed freshness**: handle clock skew, deduplication, and out-of-order events; we may use server-generated timestamps.[^3]
+
+**Likely Follow-Up Questions \& Brief Answers:**
+
+1. **Q: How do you handle read/write hotspots for very popular posts?**
+A: We avoid storing full engagement details on a single key; likes/comments are sharded or partitioned by post ID, and counters are updated via eventually consistent increments. We also cache hot posts aggressively.
+2. **Q: How would you ensure the feed is still fresh if fanout workers lag behind?**
+A: We can mix precomputed feed with a small “real-time tail” from recent posts fetched on read and merge-sort them by timestamp; plus scale workers horizontally using Kafka partitions.[^3]
+3. **Q: How do you design the follow graph storage?**
+A: Use a key-value/wide-column design: partition by userId, store sorted lists of followerIds and followingIds, with a secondary index / reverse lookup if needed; we can also use GSIs or a graph database if complexity grows.[^5]
+
+***
+
+## 9. Optimization and Trade-offs
+
+- **Time vs Space**:
+    - Fanout on write saves **read time** at the cost of increased **storage and write amplification**.[^3]
+    - Precomputing per-user feeds means storing the same post ID many times; we mitigate via trimming (only last N items per feed) and possible compression.[^4]
+- **Consistency vs Availability**:
+    - We typically choose availability and accept eventual consistency; it’s okay if a like or comment counter is slightly stale.[^1]
+    - Strong consistency may be limited to auth and critical user data.[^2]
+- **Technology Choices**:
+    - SQL vs NoSQL: user profile vs posts/feeds; relational for transactional, NoSQL for high-throughput append-heavy workloads.[^2][^4]
+    - Kafka vs direct calls: Kafka decouples services and improves resilience, but adds operational complexity.[^1]
+- **When this design may not be ideal**:
+    - For small-scale applications (<100k users), this might be over-engineered; a simpler monolith with good indexing is enough.
+    - If requirements demand strict ordering and strong consistency across multiple timelines, we might need stronger transactional guarantees and more complex ordering logic.
+
+If scale or latency constraints change (e.g., global multi-region <100 ms), we’d lean more on **geo-replication, edge caching, CDNs, and possibly edge databases**, optimizing for read-locality.[^6]
+
+***
+
+## 10. Real-World Application and Engineering Methodology
+
+In production, platforms like Facebook, Instagram, and Twitter follow very similar patterns: dedicated microservices for users/posts/graph, event-driven feed materialization, heavy caching, and hybrid feed generation models.[^7][^1][^3]
+
+From an engineering methodology standpoint:
+
+- We’d first **MVP** with a simpler architecture (maybe fewer services) and a pure fanout-on-read model.
+- Once load grows and feed queries become slow, we’d:
+    - Introduce Kafka to decouple producers and consumers.[^1]
+    - Implement feed materialization and per-user timelines.
+    - Add Redis/Cassandra for fast feed reads and caching.
+- At global scale, we’d:
+    - Add **CDN** for all media and static assets.[^6][^2]
+    - Use region-based sharding of data to minimize cross-region reads.
+    - Implement **circuit breakers**, **retries**, and **backpressure handling** around Kafka and downstream services to handle partial failures.
+
+This design pattern shows up in many production systems: not just social media feeds, but also notification timelines, activity logs, and event streams.[^4][^3]
+
+***
+
+To tailor your notes further: would you prefer a **push-vs-pull focused deep dive on feed design** next, or a **DB schema + ERD-style focus** for interviews that emphasize data modeling?
+<span style="display:none">[^10][^11][^12][^13][^14][^15][^16][^17][^18][^19][^20][^21][^22][^23][^24][^25][^26][^27][^28][^29][^30][^8][^9]</span>
 
 <div align="center">⁂</div>
 
-[^1]: https://www.youtube.com/watch?v=tCZ-oc6A3bk
+[^1]: https://www.youtube.com/watch?v=MQOz1yZaC54
 
-[^2]: https://www.linkedin.com/posts/shivam-99-somani_walmart-interview-experience-round-activity-7389553074761031680-odQ7
+[^2]: https://www.geeksforgeeks.org/system-design/design-facebook-system-design/
 
-[^3]: https://www.linkedin.com/posts/rajatgajbhiye_walmart-system-design-interview-questions-activity-7305588439654043648-fklS
+[^3]: https://algomaster.io/learn/system-design-interviews/design-fb-news-feed
 
-[^4]: https://www.geeksforgeeks.org/interview-experiences/walmart-interview-questions-for-technical-profiles/
+[^4]: https://www.scribd.com/document/843536842/Design-a-Social-Media-Feed-like-Facebook-or-Twitter
 
-[^5]: https://www.linkedin.com/posts/arun-25_interview-leetcode-walmart-activity-7379367629930627073-uWXJ
+[^5]: https://www.hellointerview.com/learn/system-design/problem-breakdowns/fb-news-feed
 
-[^6]: https://www.linkedin.com/posts/interview-stop_systemdesign-walmartinterview-campusplacements-activity-7358493238690816000-FgEj
+[^6]: https://www.youtube.com/watch?v=QkzarAFu7ZM
 
-[^7]: https://www.codinginterview.com/guide/walmart-system-design-interview-questions/
+[^7]: https://getsdeready.com/system-design-for-social-media-platforms-like-instagram/
 
-[^8]: https://www.systemdesignhandbook.com/guides/walmart-system-design-interview/
+[^8]: https://mermaid.ai/docs/blog/posts/7-er-diagram-examples-for-database-modeling-from-mermaid-ai
 
-[^9]: https://www.tryexponent.com/blog/walmart-interview-process
+[^9]: https://mermaid.ai/docs/blog/posts/how-to-build-an-er-diagram-with-mermaid-chart
 
-[^10]: https://www.educative.io/blog/walmart-system-design-interview-questions
+[^10]: https://mermaid.ai/open-source/syntax/examples.html
 
-[^11]: https://www.geeksforgeeks.org/interview-experiences/walmart-interview-experience-for-sde3/
+[^11]: https://mermaid.ai/open-source/ecosystem/integrations-create.html
 
-[^12]: https://www.interviewquery.com/interview-guides/walmart-software-engineer
+[^12]: https://www.mermaid.ai/web/
 
-[^13]: https://leetcode.com/discuss/interview-question/6146141/Walmart-SSE-Interview-Experience-or-DSA-or-LLD/
+[^13]: https://mermaid.ai/open-source/syntax/architecture.html
 
-[^14]: https://www.youtube.com/watch?v=sPSiCMTzqC0
+[^14]: https://mermaid.ai/web/products/visual-editor/
 
-[^15]: https://www.reddit.com/r/csMajors/comments/114qo61/does_walmart_global_tech_ask_system_design/
+[^15]: https://mermaid.ai/web/solutions/backend-and-data-engineers/
 
-[^16]: https://www.tryexponent.com/questions?company=walmart-labs\&role=em\&type=system-design
+[^16]: https://mermaid.ai/open-source/config/usage.html
 
-[^17]: https://javascript.plainenglish.io/interview-experience-at-walmart-global-tech-for-swe-iii-position-119aeccd36a1
+[^17]: https://mermaid.ai/docs/blog/posts/mermaid-chart-the-evolution-of-mermaid
 
-[^18]: https://gist.github.com/Neilblaze/fb87b8d1be275df1a1b83d0e58d14123
+[^18]: https://mermaid.ai/open-source/ecosystem/integrations-community.html
 
-[^19]: https://expertbeacon.com/designing-at-scale-how-walmart-created-a-design-system-for-2-million-associates/
+[^19]: https://mermaid.ai/open-source/syntax/gantt.html
 
-[^20]: https://www.linkedin.com/posts/rajatgajbhiye_during-my-system-design-round-at-walmart-activity-7400390566359851008-rkBO
+[^20]: https://mermaid.ai/open-source/news/announcements.html
 
-[^21]: https://www.reddit.com/r/leetcode/comments/1fhsa6x/walmart_global_tech_system_design_questions/
+[^21]: https://mermaid.ai/web/solutions/software-and-infrastructure-engineers/
 
-[^22]: https://www.codinginterview.com/guide/walmart-interview/
+[^22]: https://mermaid.ai/open-source/config/directives.html
 
-[^23]: https://dev.to/kriti_pare/interview-experience-at-walmart-global-tech-for-swe-iii-position-k95
+[^23]: https://www.designgurus.io/answers/detail/how-to-scale-a-social-media-platform-in-a-system-design-interview
 
-[^24]: https://www.interviewquery.com/interview-guides/walmart-data-engineer
+[^24]: https://www.youtube.com/watch?v=S2y9_XYOZsg
 
-[^25]: https://code.likeagirl.io/my-walmart-interview-experience-9cfec6c801a
+[^25]: https://getsdeready.com/top-15-low-level-design-questions-asked-in-facebook-interviews/
 
-[^26]: https://www.linkedin.com/posts/ramakanthd92_amazon-walmart-adobe-activity-7337069585222746112-RWrR
+[^26]: https://www.youtube.com/watch?v=fdz88OIOkp8
 
-[^27]: https://www.datainterview.com/blog/walmart-data-engineer-interview
+[^27]: https://www.designgurus.io/answers/detail/cracking-the-facebook-system-design-interview
+
+[^28]: https://www.hellointerview.com/learn/system-design/problem-breakdowns/fb-post-search
+
+[^29]: https://lifesage.substack.com/p/social-media-under-seige
+
+[^30]: https://www.youtube.com/watch?v=yk6tkOhzVyA
 
